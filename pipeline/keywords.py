@@ -49,6 +49,6 @@ def scene_mood(text):
                             "death", "fear", "jang", "khoon", "andhera"]):
         return "dark"
     if any(w in t for w in ["love", "peace", "morning", "spring", "hope",
-                            "mohbat", "aman", "subah", "bahaar", "umeed"]):
+                            "mohabbat", "aman", "subah", "bahaar", "umeed"]):
         return "bright"
     return "neutral"
