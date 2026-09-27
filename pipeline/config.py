@@ -2,6 +2,7 @@
 
 import os
 
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -26,4 +27,16 @@ def load_keys():
                     keys["pixabay"] = v
                 elif k == "COVERR_API_KEY" and not keys["coverr"]:
                     keys["coverr"] = v
+    # Streamlit Community Cloud: dashboard ke Secrets yahan milte hain
+    if not keys["pexels"] or not keys["pixabay"] or not keys["coverr"]:
+        try:
+            import streamlit as st
+            s = st.secrets
+            for name, k in (("PEXELS_API_KEY", "pexels"),
+                            ("PIXABAY_API_KEY", "pixabay"),
+                            ("COVERR_API_KEY", "coverr")):
+                if not keys[k] and name in s:
+                    keys[k] = s[name]
+        except Exception:
+            pass
     return keys
