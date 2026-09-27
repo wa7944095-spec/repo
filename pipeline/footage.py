@@ -1,5 +1,6 @@
 """Step 3 (v2) — Har 4-second chunk ke liye relevant visual clip.
 
+
 Source chain — pehla kamyab source use hota hai:
   1. YouTube (koi bhi video — license filter nahi; pehli preference)
   2. Pexels  (free stock, API key .env mein)
@@ -7,9 +8,11 @@ Source chain — pehla kamyab source use hota hai:
   4. Coverr  (free stock, API key .env mein)
   5. Placeholder (koi source na mile to — pipeline kabhi nahi rukti)
 
+
 Note: YouTube kabhi kabhi datacenter IPs ko 429 (rate limit) deta hai;
 us waqt chain automatically agle source par chali jati hai.
 """
+
 
 import json
 import os
@@ -17,13 +20,49 @@ import subprocess
 import sys
 import time
 
+
 import requests
 
+
 TIMEOUT = 25
+
 
 # YouTube ne is run mein rate-limit kar diya to baqi clips ke liye
 # waqt zaya kiye baghair seedha agle source par jao.
 _YT_THROTTLED = False
+
+
+def valid_clip(dest, min_secs=2.0):
+    """Downloaded clip waqayi chalti hui video hai ya khokhli/corrupt file?"""
+    try:
+        if not os.path.isfile(dest) or os.path.getsize(dest) < 50000:
+            return False
+        p = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=codec_type:format=duration",
+             "-of", "default=noprint_wrappers=1", dest],
+            capture_output=True, text=True, timeout=30)
+        out = p.stdout or ""
+        if "codec_type=video" not in out:
+            return False
+        for line in out.splitlines():
+            if line.startswith("duration="):
+                try:
+                    if float(line.split("=", 1)[1]) < min_secs:
+                        return False
+                except ValueError:
+                    pass
+        return True
+    except Exception:
+        return False
+
+
+def _remove_bad(dest):
+    try:
+        if os.path.isfile(dest):
+            os.remove(dest)
+    except OSError:
+        pass
 
 
 def _download(url, dest, min_bytes=50000, timeout=120):
@@ -32,10 +71,14 @@ def _download(url, dest, min_bytes=50000, timeout=120):
         if r.status_code == 200 and len(r.content) > min_bytes:
             with open(dest, "wb") as f:
                 f.write(r.content)
-            return True
+            if valid_clip(dest):
+                return True
+            _remove_bad(dest)  # corrupt download — reject
     except Exception:
         pass
     return False
+
+
 
 
 def pexels_clip(query, api_key, dest, orientation="landscape"):
@@ -66,6 +109,8 @@ def pexels_clip(query, api_key, dest, orientation="landscape"):
     return None
 
 
+
+
 def pixabay_clip(query, api_key, dest):
     if not api_key:
         return None
@@ -89,6 +134,8 @@ def pixabay_clip(query, api_key, dest):
     return None
 
 
+
+
 def coverr_clip(query, api_key, dest, vertical=False):
     """Coverr.co free stock — API key lazmi (free: coverr.co/developers)."""
     if not api_key:
@@ -103,6 +150,7 @@ def coverr_clip(query, api_key, dest, vertical=False):
             return None
         hits = r.json().get("hits", [])
 
+
         def pick(want_vertical):
             for h in hits:
                 is_v = bool(h.get("is_vertical"))
@@ -116,11 +164,14 @@ def coverr_clip(query, api_key, dest, vertical=False):
                             "credit": title}
             return None
 
+
         # pehle ratio ke mutabiq orientation, phir koi bhi
         return pick(vertical) or pick(None)
     except Exception:
         pass
     return None
+
+
 
 
 def youtube_clip(query, dest):
@@ -164,9 +215,10 @@ def youtube_clip(query, dest):
                      "-t", "4.5", "-c:v", "libx264", "-preset", "veryfast",
                      "-crf", "21", "-pix_fmt", "yuv420p", "-an", dest],
                     capture_output=True, text=True, timeout=180)
-                if f.returncode == 0 and os.path.exists(dest):
+                if f.returncode == 0 and valid_clip(dest):
                     return {"path": dest, "source": "youtube",
                             "credit": str(credit)[:40]}
+                _remove_bad(dest)  # tooti/corrupt download — agla result try karo
             except Exception:
                 continue
         if saw_429:
@@ -174,6 +226,8 @@ def youtube_clip(query, dest):
     except Exception:
         pass
     return None
+
+
 
 
 def fetch_visual(query, dest, keys, orientation="landscape"):
