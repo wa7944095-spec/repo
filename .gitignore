@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+.voicecut_work/
+# Whisper model (~150MB) — GitHub par push nahi hoga; cloud par khud download hoga
+models/
+test/
