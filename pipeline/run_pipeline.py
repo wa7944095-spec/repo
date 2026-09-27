@@ -17,7 +17,7 @@ import os
 
 from .transcribe import transcribe
 from .keywords import extract_query
-from .footage import fetch_visual
+from .footage import fetch_visual, valid_clip
 from .assemble import (
     RATIOS, CHUNK, XFADE, probe_duration, make_placeholder, build_segment,
     xfade_concat, make_ambient_music, make_silence, make_whoosh,
@@ -74,7 +74,7 @@ def run_pipeline(audio_path, work_dir, ratio="16:9", keys=None,
         _p(f"🎬 Clip {i+1}/{N}: '{query}'", 0.05 + 0.55 * i / N)
 
         dest = os.path.join(clips_dir, f"chunk{i+1:03d}.mp4")
-        found = fetch_visual(query, dest, keys, orientation)
+        found = fetch_visual(query, dest, keys, orientation); found = None if (found and not valid_clip(dest)) else found  # khokhli file — placeholder istemal karo
         if found:
             src, vsource, credit = found["path"], found["source"], found["credit"]
         else:
